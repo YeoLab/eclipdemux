@@ -113,8 +113,8 @@ class BarcodesFileInvalidFormatValueError(ValueError):
 
 
 ###############################################################################
-# barcode dictionary IOs
-########################
+# barcode dictionary
+####################
 
 
 def _assert_legal_barcodeid(barcodeid):
@@ -231,8 +231,8 @@ def barcodedict_create(barcode_filename):
 
 
 ###############################################################################
-# fastq IOs
-###########
+# fastq reads IOs
+#################
 
 
 def _fastqread_from_fastqio(fastqio):
@@ -271,8 +271,8 @@ def _fastqread_to_fastqio(fastqread, fastqio):
 
 
 ###############################################################################
-# matching and hamming distance functions
-#########################################
+# barcode matching
+##################
 
 
 def _assert_in_alphabet(nucl):
@@ -381,8 +381,8 @@ def barcodedict_distances(bcdict):
 
 
 ###############################################################################
-# fastqread barcode assigning
-#############################
+# barcode assigning
+###################
 
 
 def assignbarcode(readsequence, barcodedict, allowed_distance=0):
@@ -603,8 +603,8 @@ def repeatscounter_write(repeatscounter, metrics_file_name):
 
 
 ###############################################################################
-# output file handling
-######################
+# outputs file handling
+#######################
 
 
 def _fqgz_open(fastq_or_fastqgz_filename):
@@ -661,12 +661,12 @@ def _demuxfilename(dataset, newname, r1_or_r2, barcodeid):
     return jointfilename
 
 
-def _demuxdicts_make_appendfunct(demuxeddict1, demuxeddict2, dataset, newname):
+def _demuxdicts_demuxedfiles_opener(demuxeddict1, demuxeddict2, dataset, newname):
     """
-    based on 2 demueddicts, make a function that
+    based on 2 demuxeddicts, make a function that
     takes two arguments of the seq and id for a barcode
-    and appends to the 2 demuxeddicts,
-    2 open files dedicated to collect reads assigned to tha barcode
+    and appends to the 2 demuxeddicts 2 open files dedicated
+    to collect reads assigned to that barcode
     Args:
         demuxeddict1:
         demuxeddict2:
@@ -674,7 +674,7 @@ def _demuxdicts_make_appendfunct(demuxeddict1, demuxeddict2, dataset, newname):
         newname:
     Returns: an appending function,
     """
-    def appendfunct(bcseq, bcid):
+    def demuxedfiles_open(bcseq, bcid):
         """
         Appends 2 open files for saving reads assigned with barcode bcseq/bcid
         This function is dynamically generated and has "clojured" values
@@ -689,7 +689,7 @@ def _demuxdicts_make_appendfunct(demuxeddict1, demuxeddict2, dataset, newname):
         filename2 = _demuxfilename(dataset, newname, "r2", bcid)
         demuxeddict2[bcseq] = gzip.open(filename2, 'w')
 
-    return appendfunct
+    return demuxedfiles_open
 
 
 def _demuxeddicts_create(barcodedict, dataset, newname):
@@ -705,14 +705,14 @@ def _demuxeddicts_create(barcodedict, dataset, newname):
     """
     demuxeddict1, demuxeddict2 = dict(), dict()
 
-    appendfunct = _demuxdicts_make_appendfunct(demuxeddict1, demuxeddict2,
-                                               dataset, newname)
+    demuxedfiles_opener = _demuxdicts_demuxedfiles_opener(
+        demuxeddict1, demuxeddict2, dataset, newname)
     for bcseq, bcid in barcodedict.items():
-        appendfunct(bcseq, bcid)
+        demuxedfiles_opener(bcseq, bcid)
     # for reads unassigned to any barcode
-    appendfunct("", "NIL")
+    demuxedfiles_opener("", "NIL")
     # for reads too short for trimming
-    appendfunct(None, "SHO")
+    demuxedfiles_opener(None, "SHO")
 
     return demuxeddict1, demuxeddict2
 
@@ -879,8 +879,8 @@ def main():
     parser.add_option("--expectedbarcodeida", dest="expectedbarcodeida")
     parser.add_option("--expectedbarcodeidb", dest="expectedbarcodeidb")
     parser.add_option("-b", "--barcodesfile", dest="barcodesfile",
-                      help="reference barcodes file either a fasta or tsv "
-                      "if tsv columns are barcode_sequence/barcode_id")
+                      help="reference barcodes fasta or tsv file "
+                      "(tsv columns: barcode_sequence/barcode_id)")
 
     parser.add_option("--length", dest="randomer_length",
                       help="Length of randomer sequence at front of 2nd read",

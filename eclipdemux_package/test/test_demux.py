@@ -7,8 +7,6 @@ unit tests for demux.py
 
 # pylint: disable=missing-docstring
 # pylint: disable=redefined-outer-name
-
-# what is this error for ?
 # pylint: disable=protected-access
 
 from __future__ import print_function
@@ -22,6 +20,11 @@ import os
 import pytest
 
 import eclipdemux_package.demux as dmx
+
+
+###############################################################################
+# Fixtures:
+###########
 
 
 @pytest.fixture()
@@ -119,9 +122,103 @@ def datadir(tmpdir, request):
 
     return tmpdir
 
+
 ###############################################################################
-# fastq IOs
-###########
+# TestBarcodeDicts:
+###################
+
+
+@pytest.mark.xfail(raises=dmx.IllegalBarcodeIdValueError)
+def test__assert_legal_barcodeid_1():
+    dmx._assert_legal_barcodeid("NIL")
+
+
+@pytest.mark.xfail(raises=dmx.IllegalBarcodeSeqValueError)
+def test__assert_legal_barcodeseq_1():
+    dmx._assert_legal_barcodeseq("ACGTNZ")
+
+
+def test__barcodedict_from_tsvio(barcodes_tsv_file):
+    dict_expected = OrderedDict()
+    dict_expected["AAGG"] = "bcAG"
+    dict_expected["CCTT"] = "bcCT"
+    dict_produced = dmx._barcodedict_from_tsvio(barcodes_tsv_file)
+    for item_expected, item_obtained in zip(dict_expected.items(),
+                                            dict_produced.items()):
+        assert item_obtained == item_expected
+
+
+def test__barcodedict_from_fastaio(barcodes_fasta_file):
+    dict_expected = OrderedDict()
+    dict_expected["AAAGGG"] = "bcAG"
+    dict_expected["CCCTTT"] = "bcCT"
+    dict_produced = dmx._barcodedict_from_fastaio(barcodes_fasta_file)
+    for item_expected, item_obtained in zip(dict_expected.items(),
+                                            dict_produced.items()):
+        assert item_obtained == item_expected
+
+
+def test__barcodedict_add_edgecases():
+    dic = OrderedDict()
+    dic["AAAGGG"] = "bcAG"
+    dic["CCCTTT"] = "bcCT"
+    dmx._barcodedict_add_edgecases(dic)
+    assert dic[""] == "NIL"
+    assert dic[None] == "SHO"
+
+
+def test__barcodedict_reorder():
+    dic = OrderedDict()
+    dic["AAAGGG"] = "bcAG_1_2"
+    dic["CCCTTT"] = "bcCT_1"
+    dic["GGGAAA"] = "bcGA_1_2_3"
+    dic["TTTCCC"] = "bcTC"
+    dic = dmx._barcodedict_reorder(dic)
+    assert dic == OrderedDict([('GGGAAA', 'bcGA_1_2_3'),
+                               ('AAAGGG', 'bcAG_1_2'),
+                               ('CCCTTT', 'bcCT_1'),
+                               ('TTTCCC', 'bcTC')])
+
+
+def test_barcodedict_create_fasta(tmpdir):
+    expected = OrderedDict()
+    expected["AAACCC"] = "bcAC"
+    expected["GGGTTT"] = "bcGT"
+    #expected[''] = 'NIL'
+    #expected[None] = 'SHO'
+    fastafile = tmpdir.mkdir("test__barcodedict_create").join("barcodes.fasta")
+    filecontent = '>bcAC\n' 'AAACCC\n' '>bcGT\n' 'GGGTTT\n'
+    fastafile.write(filecontent)
+    obtained = dmx.barcodedict_create(str(fastafile))
+    assert obtained == expected
+
+
+def test_barcodedict_create_tsv(tmpdir):
+    expected = OrderedDict()
+    expected["AAACCC"] = "bcAC"
+    expected["GGGTTT"] = "bcGT"
+    #expected[''] = 'NIL'
+    #expected[None] = 'SHO'
+    tsvfile = tmpdir.mkdir("test__barcodedict_create").join("barcodes.tsv")
+    filecontent = 'AAACCC\t' 'bcAC\n' 'GGGTTT\t' 'bcGT\n'
+    tsvfile.write(filecontent)
+    obtained = dmx.barcodedict_create(str(tsvfile))
+    assert obtained == expected
+
+
+@pytest.mark.xfail(raises=dmx.BarcodesFileInvalidFormatValueError)
+def test_barcodedict_create_fastq():
+    dmx.barcodedict_create('basenamedoesnotmatter.fastq')
+
+
+@pytest.mark.xfail(raises=dmx.BarcodesFileInvalidFormatValueError)
+def test_barcodedict_create_csv():
+    dmx.barcodedict_create('basenamedoesnotmatter.csv')
+
+
+###############################################################################
+# TestFastqReadsIOs:
+####################
 
 
 def test__fastqread_from_fastqio_1(fastqio_toreadfrom):
@@ -169,101 +266,9 @@ def test__fastqread_to_fastqio(tmpdir):
                 + '<..<.<<<<GAAGIIGAIII\n')
     assert obtained == expected
 
-
 ###############################################################################
-# barcode dictionary IOs
-########################
-
-
-@pytest.mark.xfail(raises=dmx.IllegalBarcodeIdValueError)
-def test__assert_legal_barcodeid_1():
-    dmx._assert_legal_barcodeid("NIL")
-
-
-@pytest.mark.xfail(raises=dmx.IllegalBarcodeSeqValueError)
-def test__assert_legal_barcodeseq_1():
-    dmx._assert_legal_barcodeseq("ACGTNZ")
-
-
-def test__barcodedict_from_tsvio(barcodes_tsv_file):
-    dict_expected = OrderedDict()
-    dict_expected["AAGG"] = "bcAG"
-    dict_expected["CCTT"] = "bcCT"
-    dict_produced = dmx._barcodedict_from_tsvio(barcodes_tsv_file)
-    for item_expected, item_obtained in zip(dict_expected.items(),
-                                            dict_produced.items()):
-        assert item_obtained == item_expected
-
-
-def test__barcodedict_from_fastaio(barcodes_fasta_file):
-    dict_expected = OrderedDict()
-    dict_expected["AAAGGG"] = "bcAG"
-    dict_expected["CCCTTT"] = "bcCT"
-    dict_produced = dmx._barcodedict_from_fastaio(barcodes_fasta_file)
-    for item_expected, item_obtained in zip(dict_expected.items(),
-                                            dict_produced.items()):
-        assert item_obtained == item_expected
-
-
-def test__barcodedict_add_edgecases():
-    dic = OrderedDict()
-    dic["AAAGGG"] = "bcAG"
-    dic["CCCTTT"] = "bcCT"
-    dmx._barcodedict_add_edgecases(dic)
-    assert dic[""] == "NIL"
-    assert dic[None] == "SHO"
-
-def test__barcodedict_reorder():
-    dic = OrderedDict()
-    dic["AAAGGG"] = "bcAG_1_2"
-    dic["CCCTTT"] = "bcCT_1"
-    dic["GGGAAA"] = "bcGA_1_2_3"
-    dic["TTTCCC"] = "bcTC"
-    dic = dmx._barcodedict_reorder(dic)
-    assert dic == OrderedDict([('GGGAAA', 'bcGA_1_2_3'),
-                               ('AAAGGG', 'bcAG_1_2'),
-                               ('CCCTTT', 'bcCT_1'),
-                               ('TTTCCC', 'bcTC')])
-
-
-def test_barcodedict_create_fasta(tmpdir):
-    expected = OrderedDict()
-    expected["AAACCC"] = "bcAC"
-    expected["GGGTTT"] = "bcGT"
-    #expected[''] = 'NIL'
-    #expected[None] = 'SHO'
-    fastafile = tmpdir.mkdir("test__barcodedict_create").join("barcodes.fasta")
-    filecontent = '>bcAC\n' 'AAACCC\n' '>bcGT\n' 'GGGTTT\n'
-    fastafile.write(filecontent)
-    obtained = dmx.barcodedict_create(str(fastafile))
-    assert obtained == expected
-
-def test_barcodedict_create_tsv(tmpdir):
-    expected = OrderedDict()
-    expected["AAACCC"] = "bcAC"
-    expected["GGGTTT"] = "bcGT"
-    #expected[''] = 'NIL'
-    #expected[None] = 'SHO'
-    tsvfile = tmpdir.mkdir("test__barcodedict_create").join("barcodes.tsv")
-    filecontent = 'AAACCC\t' 'bcAC\n' 'GGGTTT\t' 'bcGT\n'
-    tsvfile.write(filecontent)
-    obtained = dmx.barcodedict_create(str(tsvfile))
-    assert obtained == expected
-
-
-@pytest.mark.xfail(raises=dmx.BarcodesFileInvalidFormatValueError)
-def test_barcodedict_create_fastq():
-    dmx.barcodedict_create('basenamedoesnotmatter.fastq')
-
-
-@pytest.mark.xfail(raises=dmx.BarcodesFileInvalidFormatValueError)
-def test_barcodedict_create_csv():
-    dmx.barcodedict_create('basenamedoesnotmatter.csv')
-
-
-###############################################################################
-# matching and hamming distance functions
-#########################################
+# TestMatching:
+###############
 
 
 @pytest.mark.xfail(raises=dmx.IllegalBarcodeSeqValueError)
@@ -336,6 +341,12 @@ def test_barcodedict_distances(barcodedict_example):
     assert dmx.barcodedict_distances(barcodedict_example) \
            == [[6, 'AAAGGG', 'bcAG', 'CCCTTT', 'bcCT']]
 
+
+###############################################################################
+# TestAssigning:
+################
+
+
 def test_assignbarcode():
     dic = OrderedDict()
     dic["AAAGGG"] = "bcAG"
@@ -345,8 +356,8 @@ def test_assignbarcode():
 
 
 ###############################################################################
-# fastq reads updates
-#####################
+# TestReformatting:
+###################
 
 
 @pytest.mark.xfail(raises=dmx.PairedEndReadsNameMisMatchValueError)
@@ -432,6 +443,7 @@ def test__pairedreads_reformat_2():
     )
     assert obtained == expected
 
+
 def test__pairedreads_reformat_3():
     fastqread1 = {'title': 'D00611', 'sequence': 'ACGT', 'quality': '<..<'}
     fastqread2 = {'title': 'D00611', 'sequence': 'TCGA', 'quality': '<I><'}
@@ -449,46 +461,14 @@ def test__pairedreads_reformat_3():
 
 
 ###############################################################################
-# fastq reads updates
+# TestRepeatsCounting:
 #####################
-
-
-# def test_cwlhandover_write(tmpdir):
-#     testdir = tmpdir.mkdir("test_cwlhandover_write")
-#     dmx.cwlhandover_write('dataset1', 'newname1', 'bcida', 'bcidb', str(testdir))
-#     # assert testdir.join('dataset1').read() == 'dataset1'
-#     # assert testdir.join('newname1').read() == 'newname1'
-#     # assert testdir.join('bcida').read() == 'bcida'
-#     # assert testdir.join('bcidb').read() == 'bcidb'
-
-
-def test_cwlhandover_write(tmpdir):
-    cwd = os.getcwd()
-    os.chdir(str(tmpdir))
-    dmx.cwlhandover_write('dataset1', 'newname1', 'bcida', 'bcidb')
-    os.chdir(cwd)
-    obtained = [tmpdir.join('dataset1').read(),
-                tmpdir.join('newname1').read(),
-                tmpdir.join('bcida').read(),
-                tmpdir.join('bcidb').read()]
-    assert obtained == ['dataset1', 'newname1', 'bcida', 'bcidb']
-
-
-def test__demuxfilename():
-    assert dmx._demuxfilename("s.RBFOX2", "IP.1", "r1", "X1A") \
-        == "s.RBFOX2.IP.1.X1A.r1.fq.gz"
-    assert dmx._demuxfilename("s.RBFOX2", "IP.1", "r2", "X1A") \
-        == "s.RBFOX2.IP.1.X1A.r2.fq.gz"
-
-
-###############################################################################
-# umi repeats counting
-######################
 
 
 def test_repeatscounter_create():
     counter = dmx.repeatscounter_create()
     assert isinstance(counter, Counter)
+
 
 def test_repeatscounter_write(repeatscounter, tmpdir):
     repeatscountfile = tmpdir.mkdir("test_repeatscounter_write")\
@@ -535,26 +515,45 @@ def test_repeatscounter_increment(repeatscounter):
 
 
 ###############################################################################
-# output file handling, core demux function
-###########################################
+# TestOutputsFileHandling
+#########################
 
 
 def test_fqgz_open():
     pass
 
 
+# def test_cwlhandover_write(tmpdir):
+#     testdir = tmpdir.mkdir("test_cwlhandover_write")
+#     dmx.cwlhandover_write('dataset1', 'newname1', 'bcida', 'bcidb', str(testdir))
+#     # assert testdir.join('dataset1').read() == 'dataset1'
+#     # assert testdir.join('newname1').read() == 'newname1'
+#     # assert testdir.join('bcida').read() == 'bcida'
+#     # assert testdir.join('bcidb').read() == 'bcidb'
+
+
+def test_cwlhandover_write(tmpdir):
+    cwd = os.getcwd()
+    os.chdir(str(tmpdir))
+    dmx.cwlhandover_write('dataset1', 'newname1', 'bcida', 'bcidb')
+    os.chdir(cwd)
+    obtained = [tmpdir.join('dataset1').read(),
+                tmpdir.join('newname1').read(),
+                tmpdir.join('bcida').read(),
+                tmpdir.join('bcidb').read()]
+    assert obtained == ['dataset1', 'newname1', 'bcida', 'bcidb']
+
+
+def test__demuxfilename():
+    assert dmx._demuxfilename("s.RBFOX2", "IP.1", "r1", "X1A") \
+        == "s.RBFOX2.IP.1.X1A.r1.fq.gz"
+    assert dmx._demuxfilename("s.RBFOX2", "IP.1", "r2", "X1A") \
+        == "s.RBFOX2.IP.1.X1A.r2.fq.gz"
+
+
 ###############################################################################
-# core demux function
-#####################
-
-
-def test_demux():
-    pass
-
-
-###############################################################################
-# datastructures setup and wrapup
-#################################
+# TestDatastructure:
+####################
 
 def test_datastructure_setup(tmpdir):
     tsvfile = tmpdir.mkdir("test__barcodedict_create").join("barcodes.tsv")
@@ -575,20 +574,39 @@ def test_datastructure_wrapup():
     # datastr =
     # metricsfile =
     # dmx.datastructure_wrapup(datastr, metricsfile)
-    # TODO
     pass
 
 
 ###############################################################################
-# module's main function
-#############################
+# TestDemuxCore:
+################
+
+
+def test_demux():
+    pass
+
+
+################################################################################
+# TestMain:
+###########
 
 def test_main():
     pass
 
 
-# TUTORIAL
-##########
+###############################################################################
+# CLI:
+######
+
+
+if __name__ == '__main__':
+    pytest.main()
+
+
+###############################################################################
+# TUTORIALS
+###########
+
 # def setup_module(module):
 #     print ("setup_module      module:%s" % module.__name__)
 #
@@ -601,37 +619,29 @@ def test_main():
 # def teardown_function(function):
 #     print ("teardown_function function:%s" % function.__name__)
 
-
-# TUTORIAL
-##########
+#
+# ---------------------
 # @pytest.fixture()
 # def starting_next_test():
 #     print('\nStarting next test')
 
-
 # from pytest import fixture
 # import os
-
 
 # from __future__ import unicode_literals
 # import sys
 # sys.path.insert(0, '../eclipdemux/eclipdemux')
 
-
 # from __future__ import unicode_literals
 # from distutils import dir_util
 
-
-# TUTORIAL
-##########
 # fixture directory
-####################
+# -----------------
 # work out path for directory where test files ares tored
 # FIXTURE_DIR = os.path.join(
 #     os.path.dirname(os.path.realpath(__file__)),
 #     'testfiles',
 #     )
-
 
 # @fixture
 # def datadir(tmpdir, request):
@@ -651,9 +661,3 @@ def test_main():
 # @pytest.mark.datafiles(
 #     os.path.join(FIXTURE_DIR, 'barcodes.fasta')
 # )
-
-
-# TUTORIAL
-##########
-if __name__ == '__main__':
-    pytest.main()
