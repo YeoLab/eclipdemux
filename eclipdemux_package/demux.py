@@ -21,7 +21,7 @@ from collections import Counter
 # from collections import defaultdict
 from collections import OrderedDict
 from collections import namedtuple
-from itertools import izip
+#from itertools import izip  Python 3 has the zip function built-in and it need not be imported via itertools.
 import gzip
 import os
 from optparse import OptionParser
@@ -261,12 +261,12 @@ def _fastqread_to_fastqio(fastqread, fastqio):
         fastqio: a stream (ex opened file) with the content of a fastq file
     Returns: None
     """
-    fastqio.write(
+    fastqio.write((
         '@' + fastqread['title'] + '\n' +
         fastqread['sequence'] + '\n' +
         '+' + '\n' +
         fastqread['quality'] + '\n'
-    )
+    ).encode())                         #File was opened in binary format so cannot directly write strings to it
     return fastqio
 
 
@@ -330,7 +330,7 @@ def _hamming(matching_function, word1, word2):
     if len(word1) < len(word2):
         raise_with_traceback(HammingUnequalLengthsValueError(word1, word2))
     return sum(not matching_function(letter1, letter2)
-               for letter1, letter2 in izip(word1, word2))
+               for letter1, letter2 in zip(word1, word2))  #Changed it to zip - Python 3 specifications
 
 
 def hamming_strict(word1, word2):
