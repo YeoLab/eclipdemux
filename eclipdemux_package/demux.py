@@ -450,8 +450,8 @@ def _assert_same_name(fastqread1, fastqread2):
         fastqread2: fastq dict for other end pairing with fastqread1
     Returns: None
     """
-    print('fastqread1', fastqread1)
-    print('fastqread2', fastqread2)
+    # print('fastqread1', fastqread1)
+    # print('fastqread2', fastqread2)
     fastqread1_name = fastqread1["title"].split()[0]
     fastqread2_name = fastqread2["title"].split()[0]
     if fastqread1_name != fastqread2_name:
@@ -570,7 +570,7 @@ def repeatscounter_increment(repeatscounter, barcode, bcfound, umi):
         umi: randomer sequence
     Returns: None
     """
-    print("incrementing", barcode, bcfound, umi)
+    # print("incrementing", barcode, bcfound, umi)
     repeatscounter[(barcode, bcfound, umi)] += 1
     return None
 
